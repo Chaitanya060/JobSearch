@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>{{ contact.name }} — Resume</title>
+<style>
+  @page { size: Letter; margin: 0.5in 0.6in; }
+  body { font-family: "Helvetica", "Arial", sans-serif; font-size: 10.5pt;
+         color: #111; line-height: 1.35; }
+  h1 { font-size: 18pt; margin: 0 0 2pt; }
+  .meta { color: #333; margin-bottom: 10pt; }
+  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px;
+       border-bottom: 1px solid #333; padding-bottom: 2pt; margin: 12pt 0 6pt; }
+  .row { display: flex; justify-content: space-between; margin-top: 4pt; }
+  .role { font-weight: bold; }
+  ul { margin: 2pt 0 2pt 16pt; padding: 0; }
+  li { margin: 1pt 0; }
+  .skills { line-height: 1.6; }
+  a { color: #111; text-decoration: none; }
+</style>
+</head>
+<body>
+  <h1>{{ contact.name }}</h1>
+  <div class="meta">
+    {{ contact.email }} · {{ contact.phone }} · {{ contact.location }}
+    {% if contact.links.linkedin %} · <a href="{{ contact.links.linkedin }}">LinkedIn</a>{% endif %}
+    {% if contact.links.github %} · <a href="{{ contact.links.github }}">GitHub</a>{% endif %}
+    {% if contact.links.portfolio %} · <a href="{{ contact.links.portfolio }}">Portfolio</a>{% endif %}
+  </div>
+
+  {% if summary %}
+  <h2>Summary</h2>
+  <div>{{ summary }}</div>
+  {% endif %}
+
+  {% if skills %}
+  <h2>Skills</h2>
+  <div class="skills">{{ skills | join(" · ") }}</div>
+  {% endif %}
+
+  {% if experience %}
+  <h2>Experience</h2>
+  {% for e in experience %}
+    <div class="row">
+      <div><span class="role">{{ e.role }}</span> — {{ e.company }}</div>
+      <div>{{ e.start }} – {{ e.end }}{% if e.location %} · {{ e.location }}{% endif %}</div>
+    </div>
+    {% if e.bullets %}<ul>{% for b in e.bullets %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% if projects %}
+  <h2>Projects</h2>
+  {% for p in projects %}
+    <div class="row">
+      <div><span class="role">{{ p.name }}</span>{% if p.stack %} — {{ p.stack | join(", ") }}{% endif %}</div>
+      {% if p.url %}<div><a href="{{ p.url }}">{{ p.url }}</a></div>{% endif %}
+    </div>
+    {% if p.bullets %}<ul>{% for b in p.bullets %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% if education %}
+  <h2>Education</h2>
+  {% for ed in education %}
+    <div class="row">
+      <div><span class="role">{{ ed.degree }}</span> — {{ ed.school }}</div>
+      <div>{{ ed.start }} – {{ ed.end }}</div>
+    </div>
+    {% if ed.notes %}<div>{{ ed.notes }}</div>{% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% if certifications %}
+  <h2>Certifications</h2>
+  <ul>{% for c in certifications %}<li>{{ c }}</li>{% endfor %}</ul>
+  {% endif %}
+</body>
+</html>

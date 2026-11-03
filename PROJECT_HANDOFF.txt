@@ -1,0 +1,509 @@
+================================================================================
+JOB HUNTER PLATFORM — PROJECT HANDOFF
+Location:  C:\Users\chait\OneDrive\Desktop\JobSearch
+Owner:     Chaitanya
+As of:     3 November 2026
+================================================================================
+
+
+────────────────────────────────────────────────────────────────────────────────
+1. WHAT THIS PROJECT IS
+────────────────────────────────────────────────────────────────────────────────
+
+A zero-cost automated job hunter targeting STARTUPS. It runs twice a day,
+discovers fresh roles from public ATS feeds and HN, scores each against your
+master resume with Gemini AI, compiles a tailored PDF, and queues everything in
+a review dashboard.
+
+Core principle:
+  Automate discovery, scoring, tailoring, preparation. KEEP A HUMAN on every
+  irreversible action — form submission and email send. The cron never submits
+  an application and never sends an email on its own.
+
+Why this design:
+  Fully automating form submission or cold-email sending gets your Gmail
+  suspended and your name flagged at the exact companies you want to join. This
+  system does the 90% of work that's safe to automate; you do the final click.
+
+What it DOES:
+  - Continuously discovers fresh roles from public ATS JSON endpoints + feeds
+  - Deduplicates every listing BEFORE spending any AI token / API credit
+  - Scores each role for fit (0-100) and compiles a truthfully-tailored,
+    ATS-safe PDF resume
+  - Resolves each company's domain and surfaces ONLY recruiter addresses a
+    human published (never guessed)
+  - Presents everything in a dashboard: fit score, resume PDF, prefill link,
+    drafted note
+  - Pushes Telegram alerts for high-fit roles
+
+What it DOES NOT do:
+  - NO headless auto-submission of application forms
+  - NO automated cold-email sending on a schedule
+  - NO guessed email permutations
+  - NO multi-account free-tier key rotation
+
+
+────────────────────────────────────────────────────────────────────────────────
+2. HOW IT WORKS (THE PIPELINE)
+────────────────────────────────────────────────────────────────────────────────
+
+STAGE 1 — Ingestion (automated)
+  Pulls fresh jobs from:
+    - Greenhouse public JSON  (boards-api.greenhouse.io/v1/boards/<slug>/jobs)
+    - Lever public JSON       (api.lever.co/v0/postings/<slug>)
+    - Ashby public JSON       (api.ashbyhq.com/posting-api/job-board/<slug>)
+    - RemoteOK API
+    - Himalayas JSON feed
+    - WeWorkRemotely RSS
+    - Jobicy RSS
+    - Hacker News "Who is hiring?" monthly thread
+  Dedup: SHA-256 of canonical apply URL + SHA-256(company|normalised_title).
+  Status after: DISCOVERED.
+
+STAGE 2 — Enrichment (automated)
+  For each DISCOVERED job:
+    - Resolve company domain (apply-URL host, or Clearbit Autocomplete)
+    - Validate the domain with DNS MX lookup
+    - Find contacts ONLY from published sources:
+        * JD/page regex (mailto: links, inline emails)
+        * Hunter.io free tier (optional, if HUNTER_API_KEY set)
+      Role aliases (noreply@, support@, info@) are dropped.
+      Guessed addresses are NEVER stored.
+  Status after: ENRICHED.
+
+STAGE 3 — Fit & Tailor (automated)
+  For each ENRICHED job discovered in the last 36 hours:
+    - Gemini Flash scores 0-100 fit, picks 8-12 skills from your inventory,
+      reorders real bullets so JD keywords surface, returns tailored JSON.
+    - resume_validator.py REJECTS any edit that invents a company, role,
+      metric, date, project, or skill not in your master_resume.json.
+    - Jinja2 + WeasyPrint (or ReportLab fallback) renders single-column
+      ATS-safe PDF.
+  Status after: TAILORED.
+  Side effect: Telegram alert if fit_score >= 75.
+
+STAGE 4 — Prepare Queue (automated)
+  Prefill builder constructs a URL with your contact info already in query
+  params so the ATS form autofills when you open it.
+
+STAGE 5 — Review & Act (YOU — human in the loop)
+  Open the Streamlit dashboard. For each role:
+    - Preview the tailored PDF
+    - Click "Build prefill link" → opens apply URL with your details
+    - YOU submit the form (never the bot)
+    - Click "Mark applied"
+  Outreach drafts (optional):
+    - Only drafted for is_confirmed_source=TRUE contacts
+    - Shown in the dashboard as subject + body you can edit
+    - YOU send from YOUR Gmail — never from the cron
+
+
+────────────────────────────────────────────────────────────────────────────────
+3. WHAT'S BEEN BUILT (CODE INVENTORY)
+────────────────────────────────────────────────────────────────────────────────
+
+JobSearch/
+├── .env.example                          # fill in → .env (gitignored)
+├── .github/workflows/daily_pipeline.yml  # cron: 08:00 + 16:00 IST
+├── .gitignore
+├── README.md
+├── PROJECT_HANDOFF.txt                   # (this file)
+├── requirements.txt
+│
+├── data/
+│   ├── master_resume.example.json        # copy to master_resume.json, fill
+│   ├── master_resume.json                # YOUR real info (gitignored)
+│   ├── resume_template.html              # single-column ATS layout
+│   ├── companies.yaml.example
+│   ├── companies.yaml                    # 26 live startup slugs
+│   └── jobs.sqlite                       # local DB (auto-created)
+│
+├── output/                               # tailored PDFs land here
+│
+├── dashboard/
+│   └── app.py                            # Streamlit review queue
+│
+└── src/
+    ├── config.py                         # reads .env, thresholds
+    ├── db.py                             # Supabase or SQLite fallback
+    ├── filters.py                        # keyword + seniority gate
+    ├── run_daily_pipeline.py             # entry point
+    │
+    ├── scrapers/
+    │   ├── ats_feeds.py                  # Greenhouse / Lever / Ashby
+    │   ├── rss_boards.py                 # RemoteOK / Himalayas / WWR / Jobicy
+    │   └── startups.py                   # HN "Who is hiring?"
+    │
+    ├── enrichment/
+    │   ├── domain_resolver.py            # name → domain + MX check
+    │   └── contact_finder.py             # confirmed-source only
+    │
+    ├── ai_engine/
+    │   ├── llm_client.py                 # Gemini + Groq fallback
+    │   ├── resume_tailor.py              # score + tailor
+    │   ├── resume_validator.py           # truth enforcement (NON-NEGOTIABLE)
+    │   ├── pdf_compiler.py               # WeasyPrint, ReportLab fallback
+    │   └── note_writer.py                # outreach draft
+    │
+    ├── applicator/
+    │   └── prefill_builder.py            # builds prefill URL (never submits)
+    │
+    └── alerts/
+        └── telegram.py                   # push alerts
+
+Status by phase:
+  [x] Phase 1 — Scaffold, config, DB abstraction, dedup
+  [x] Phase 2 — Scrapers (Greenhouse / Lever / Ashby / RSS / HN) + Telegram
+  [x] Phase 3 — Enrichment (domain + confirmed-source contacts)
+  [x] Phase 4 — AI tailor + validator + PDF compile
+  [x] Phase 5 — Streamlit dashboard + prefill + GitHub Actions cron
+  [x] Phase 6 — Outreach drafts (optional, manual send)
+
+Everything was smoke-tested locally. Last live run:
+  - 5,276 raw rows pulled across 7 sources
+  - 317 inserted after filter + dedup
+  - HN pulled the correct Nov-2026 thread
+  - 26 of 47 company slugs resolved live (dead ones pruned)
+
+
+────────────────────────────────────────────────────────────────────────────────
+4. WHAT YOU NEED TO DO (TO MAKE IT PRODUCE REAL OUTPUT)
+────────────────────────────────────────────────────────────────────────────────
+
+Order matters. Do these in sequence.
+
+STEP 1 — Fill YOUR master resume  (5 minutes, local, no accounts)
+──────────────────────────────────────────────────────────────────
+  cp data/master_resume.example.json data/master_resume.json
+  (On Windows: copy the file manually in Explorer.)
+
+  Open data/master_resume.json and fill in:
+    - contact.name, email, phone, location, LinkedIn, GitHub, portfolio
+    - summary (1 line, truthful)
+    - skills_inventory: EVERY skill you'd ever claim, 15-40 items
+    - experience: every job with role, dates, bullets (real metrics)
+    - projects: every project you'd mention, with URL and bullets
+    - education, certifications
+
+  This file is gitignored. The AI tailor is only allowed to use skills,
+  bullets, companies, dates that exist in THIS file. If you leave a
+  skill out, it never shows up on any tailored resume.
+
+
+STEP 2 — Get your Gemini API key  (10 minutes, free)
+────────────────────────────────────────────────────
+  1. Go to  https://aistudio.google.com
+  2. Sign in with your Google account
+  3. Click "Get API key" → "Create API key" → copy it
+  4. In the project folder:
+       copy .env.example .env
+     Then edit .env and paste:
+       GEMINI_API_KEY=paste_the_key_here
+  Free tier: ~250 requests/day on Flash. Enough for ~100 tailored resumes/day.
+
+
+STEP 3 — Set up Telegram alerts  (10 minutes, free, OPTIONAL but recommended)
+─────────────────────────────────────────────────────────────────────────────
+  1. On Telegram, message @BotFather
+  2. Send /newbot, follow the prompts, name your bot
+  3. Copy the token BotFather gives you
+  4. Message YOUR new bot (just send "hi") so it has a chat with you
+  5. Open in a browser:
+       https://api.telegram.org/bot<TOKEN>/getUpdates
+     Find "chat":{"id":123456789 ...} — that's your chat_id
+  6. In .env:
+       TELEGRAM_BOT_TOKEN=paste_token_here
+       TELEGRAM_CHAT_ID=paste_chat_id_here
+
+
+STEP 4 — Install dependencies and run first time  (5 minutes)
+──────────────────────────────────────────────────────────────
+  Open PowerShell in the project folder:
+
+    python -m venv .venv
+    .venv\Scripts\activate
+    pip install -r requirements.txt
+    playwright install chromium          # (optional, for prefill-fill)
+
+  Then run the pipeline:
+    python -m src.run_daily_pipeline
+
+  First run output you should see:
+    INFO pipeline: ingest: seen=~5000 filtered=~4800 inserted=~300
+    INFO pipeline: enrich: jobs=25 domains=18 contacts=4
+    INFO pipeline: tailor: ok=25 alerted=3 failed=0
+    (If no GEMINI_API_KEY, tailor is skipped — not an error.)
+
+  Then open the review dashboard:
+    streamlit run dashboard/app.py
+
+  Browser opens at http://localhost:8501 with the queue.
+
+
+STEP 5 — Daily use flow  (10-15 minutes a day)
+───────────────────────────────────────────────
+  Morning:
+    1. Open the dashboard (streamlit run dashboard/app.py)
+    2. Sidebar is set to "Last 24 hours" by default → you only see new roles
+    3. Sort by fit score (highest at top)
+    4. For each role you like:
+         a. Click "Tailored resume PDF" to download it
+         b. Click "Build prefill link" → copy the URL
+         c. Open the URL in a browser → form is pre-populated
+         d. Review every field (never trust it blindly), add resume PDF, submit
+         e. Click "Mark applied" in the dashboard
+    5. For outreach drafts (if any contacts were confirmed):
+         a. Copy the subject + body
+         b. Personalise it in your own Gmail
+         c. Attach your tailored PDF
+         d. Send FROM YOUR OWN GMAIL (never from the cron)
+         e. Click "I sent this myself"
+
+  The cron runs twice a day on GitHub Actions once Step 7 is set up.
+
+
+STEP 6 — (OPTIONAL) Set up Supabase for persistent cloud DB
+────────────────────────────────────────────────────────────
+  Right now the DB is a local SQLite file at data/jobs.sqlite — fine for
+  local use. If you want it in the cloud (so GitHub Actions can read/write
+  the same DB that your dashboard reads):
+
+  1. Go to  https://supabase.com  → New Project (free tier)
+  2. In the SQL Editor, run the schema from the top of src/db.py:
+     (or paste these DDL statements — same ones already in docstrings)
+
+     CREATE TABLE jobs (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       job_hash VARCHAR(64) UNIQUE NOT NULL,
+       apply_url_hash VARCHAR(64) UNIQUE,
+       source VARCHAR(50) NOT NULL,
+       company_name VARCHAR(255) NOT NULL,
+       company_domain VARCHAR(255),
+       job_title VARCHAR(255) NOT NULL,
+       location VARCHAR(255),
+       job_url TEXT NOT NULL,
+       ats_type VARCHAR(50),
+       description_raw TEXT,
+       description_summary TEXT,
+       fit_score INTEGER DEFAULT 0,
+       missing_keywords JSONB DEFAULT '[]'::jsonb,
+       status VARCHAR(40) DEFAULT 'DISCOVERED',
+       discovered_at TIMESTAMPTZ DEFAULT NOW()
+     );
+     CREATE TABLE contacts (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+       person_name VARCHAR(255),
+       person_role VARCHAR(255),
+       email VARCHAR(255) NOT NULL,
+       confidence_score INTEGER DEFAULT 0,
+       discovery_method VARCHAR(50),
+       is_confirmed_source BOOLEAN DEFAULT FALSE,
+       UNIQUE(job_id, email)
+     );
+     CREATE TABLE applications (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       job_id UUID UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
+       tailored_resume_json JSONB NOT NULL,
+       resume_pdf_url TEXT,
+       prefill_payload JSONB,
+       apply_method VARCHAR(40),
+       applied_at TIMESTAMPTZ
+     );
+     CREATE TABLE outreach_drafts (
+       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+       contact_id UUID REFERENCES contacts(id) ON DELETE CASCADE,
+       subject_line TEXT NOT NULL,
+       body_text TEXT NOT NULL,
+       send_status VARCHAR(40) DEFAULT 'DRAFT',
+       sent_at TIMESTAMPTZ
+     );
+
+  3. In Supabase Settings → API, copy the URL and the service_role key
+  4. Paste into .env:
+       SUPABASE_URL=https://xxxx.supabase.co
+       SUPABASE_KEY=eyJhbG...
+     The code auto-detects these and switches off SQLite.
+
+
+STEP 7 — (OPTIONAL) Set up the GitHub Actions daily cron
+─────────────────────────────────────────────────────────
+  Only needed if you want it to run automatically twice a day. For now,
+  running python -m src.run_daily_pipeline manually is fine.
+
+  1. Make the repo PRIVATE on GitHub (it contains your resume!)
+       git init
+       git add .
+       git commit -m "initial"
+       Create a PRIVATE repo on GitHub and push to it.
+  2. On the repo's GitHub page: Settings → Secrets and variables → Actions
+       Add these secrets (same values as your .env):
+         GEMINI_API_KEY
+         GROQ_API_KEY           (optional)
+         SUPABASE_URL           (if using Supabase)
+         SUPABASE_KEY
+         HUNTER_API_KEY         (optional)
+         TELEGRAM_BOT_TOKEN
+         TELEGRAM_CHAT_ID
+         MASTER_RESUME_JSON     (paste the entire JSON content)
+  3. The workflow at .github/workflows/daily_pipeline.yml is already there.
+     It runs at 08:00 + 16:00 IST every day.
+  4. You can trigger it manually anytime: Actions tab → "Job Hunter -- Discover
+     & Prepare" → "Run workflow".
+  5. Tailored PDFs are uploaded as artifacts for 7 days.
+
+  CRITICAL: Keep the repo PRIVATE. It has your resume and API keys.
+
+
+────────────────────────────────────────────────────────────────────────────────
+5. TUNING KNOBS (in .env)
+────────────────────────────────────────────────────────────────────────────────
+
+FIT_SCORE_ALERT_THRESHOLD=75
+  Minimum fit score to send a Telegram alert. 75 is loose; raise to 85 for
+  only the strongest matches.
+
+DAILY_ROLE_BUDGET=25
+  How many roles per run get sent to Gemini. 25/day × 2 runs = 50 tailored
+  resumes/day, well under the Gemini free quota of ~250 RPD.
+
+TARGET_KEYWORDS=python,java,backend,fullstack,spring,react,node,typescript,go,rust,founding,generalist
+  Comma-separated. A role needs at least 1 of these in its title+description,
+  OR the words "founding"/"generalist"/"early engineer", to pass the filter.
+
+TARGET_LOCATIONS=Remote,Bengaluru,Hyderabad,India
+  Comma-separated. If a job has a location, it must contain one of these.
+  Jobs with no listed location pass through (common for startups).
+
+EXCLUDE_SENIORITY=Staff,Principal,Director,VP
+  Titles containing any of these are rejected. Also auto-rejected: anything
+  mentioning "10+ years" (or 20+, 30+, ...).
+
+
+────────────────────────────────────────────────────────────────────────────────
+6. HOW IT STAYS "ONLY TODAY'S NEW JOBS"
+────────────────────────────────────────────────────────────────────────────────
+
+  1. INSERT DEDUP — apply_url_hash + job_hash are UNIQUE columns. A duplicate
+     insert returns None without raising. Repeated runs of the same scrape
+     never add the same role twice.
+  2. STATUS PROGRESSION — DISCOVERED → ENRICHED → TAILORED → APPLIED.
+     Each stage only picks up rows at the previous status. Already-tailored
+     rows are never re-tailored.
+  3. TAILOR TIME-BOX — Only ENRICHED rows discovered in the last 36 hours get
+     sent to Gemini. Older rows that somehow stayed ENRICHED (e.g. first run
+     exceeded DAILY_ROLE_BUDGET) are not retried, protecting your quota.
+  4. DASHBOARD DEFAULT WINDOW — Sidebar defaults to "Last 24 hours". Switch
+     to 48h / 7 days / All time as needed.
+  5. TELEGRAM ALERTS — Only fire during the tailor step, which only runs on
+     fresh rows. You won't get re-alerted for the same job.
+
+
+────────────────────────────────────────────────────────────────────────────────
+7. SAFETY GUARANTEES (BUILT INTO THE CODE)
+────────────────────────────────────────────────────────────────────────────────
+
+  - The pipeline NEVER submits a form.
+    (The applicator module only BUILDS a prefill URL; there is no .click('submit').)
+  - The pipeline NEVER sends an email.
+    (note_writer only drafts; no SMTP code exists anywhere in the project.)
+  - The AI resume tailor cannot invent facts.
+    (resume_validator.py rejects any experience/project/skill not in your
+    master_resume.json. Smoke-tested with a seeded fabrication: it was caught.)
+  - Only contacts a human published are stored.
+    (contact_finder requires the email to match the company domain AND not be
+    a role alias AND come from a published source: JD regex, mailto link, or
+    Hunter-with-sources. No permutations.)
+  - Rate limits respected.
+    (5-second sleep between Gemini calls; Groq fallback on 429.)
+
+
+────────────────────────────────────────────────────────────────────────────────
+8. TROUBLESHOOTING
+────────────────────────────────────────────────────────────────────────────────
+
+"ModuleNotFoundError: No module named 'X'"
+  → Activate the venv first:  .venv\Scripts\activate
+  → Then: pip install -r requirements.txt
+
+"tailor: 0, reason: no_master"
+  → data/master_resume.json doesn't exist. Create it from the .example.
+
+"gemini 429" in logs
+  → You hit the free quota. The code falls back to Groq if GROQ_API_KEY is set,
+    otherwise skips that job. Try again tomorrow or add GROQ_API_KEY.
+
+"Playwright not found" on first run
+  → playwright install chromium
+  (Prefill works even without Playwright — it just can't type into the actual
+   form; it only builds the prefill URL. The URL alone fills most ATS forms.)
+
+PDF has weird layout
+  → WeasyPrint needs libpango on Linux. On Windows it may fall back to
+    ReportLab (which produces a simpler but still ATS-safe PDF). To get the
+    fancier WeasyPrint output on Windows, install GTK3 runtime.
+
+Dashboard shows 0 rows
+  → You probably haven't run the pipeline yet, or the status filter is wrong.
+    Switch "Status" to "DISCOVERED" and "Discovered within" to "All time".
+
+HN scraper returning old posts
+  → Already fixed. Uses search_by_date to get the current month's thread.
+
+Supabase schema error
+  → You skipped the DDL in Step 6. Run the SQL in the Supabase editor.
+
+
+────────────────────────────────────────────────────────────────────────────────
+9. QUICK REFERENCE — COMMANDS
+────────────────────────────────────────────────────────────────────────────────
+
+  # First-time setup
+  python -m venv .venv
+  .venv\Scripts\activate
+  pip install -r requirements.txt
+
+  # Run full pipeline (discover + enrich + tailor + alert)
+  python -m src.run_daily_pipeline
+
+  # Just discover new jobs (no AI, no API calls)
+  python -m src.run_daily_pipeline --ingest-only
+
+  # Just enrich already-discovered jobs
+  python -m src.run_daily_pipeline --enrich-only
+
+  # Just tailor already-enriched jobs
+  python -m src.run_daily_pipeline --tailor-only
+
+  # Add outreach drafts (opt-in)
+  python -m src.run_daily_pipeline --draft-outreach
+
+  # Open the review dashboard
+  streamlit run dashboard/app.py
+
+  # Check what's in the local DB
+  python -c "import sqlite3; c=sqlite3.connect('data/jobs.sqlite'); print(list(c.execute('SELECT status, COUNT(*) FROM jobs GROUP BY status')))"
+
+
+────────────────────────────────────────────────────────────────────────────────
+10. WHERE TO EXPAND NEXT (NOT URGENT)
+────────────────────────────────────────────────────────────────────────────────
+
+  - YC Work at a Startup scraper (needs a workaround for their embedded
+    Algolia key — one option is to parse their public RSS feed instead)
+  - LinkedIn Jobs scraper (requires Playwright + careful rate limiting)
+  - Wellfound / AngelList scraper (same)
+  - Automatic resume-gap tracking: aggregate missing_keywords across rejected
+    roles to show "which skills to learn next"
+  - Skill-score coverage: show which keywords in a JD your resume evidences
+    vs. doesn't, next to the fit score
+  - Monthly archive: move anything older than 30 days to a cold table so the
+    main DB stays small
+  - Follow-up reminder: dashboard shows "7 days since you applied, consider
+    following up" for applications with contacts
+
+
+================================================================================
+END OF HANDOFF.  You can read this file top-to-bottom to resume this project.
+================================================================================

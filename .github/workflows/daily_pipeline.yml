@@ -1,0 +1,63 @@
+name: Job Hunter -- Discover & Prepare
+
+on:
+  schedule:
+    - cron: '30 2,10 * * *'    # 08:00 & 16:00 IST
+  workflow_dispatch:
+
+jobs:
+  discover-and-prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-v1
+
+      - name: System deps for WeasyPrint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libffi-dev
+
+      - name: Python deps
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+
+      - name: Inject master resume from secret
+        env:
+          MASTER_RESUME_JSON: ${{ secrets.MASTER_RESUME_JSON }}
+        run: |
+          mkdir -p data
+          if [ -n "$MASTER_RESUME_JSON" ]; then
+            printf '%s' "$MASTER_RESUME_JSON" > data/master_resume.json
+          fi
+
+      - name: Discover + enrich + tailor (NO submit, NO send)
+        env:
+          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY:       ${{ secrets.GROQ_API_KEY }}
+          SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
+          HUNTER_API_KEY:     ${{ secrets.HUNTER_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m src.run_daily_pipeline --prepare-only
+
+      - name: Upload tailored PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tailored-resumes
+          path: output/*.pdf
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+data/master_resume.json
+output/
+*.pdf
+.streamlit/secrets.toml
+data/jobs.sqlite
+data/jobs.sqlite-*

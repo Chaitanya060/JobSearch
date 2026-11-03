@@ -1,0 +1,12 @@
+# Public ATS slugs to poll. Rename to companies.yaml.
+greenhouse:
+  - stripe
+  - airbnb
+  - gitlab
+  - cloudflare
+lever:
+  - netflix
+  - plaid
+ashby:
+  - ramp
+  - vercel

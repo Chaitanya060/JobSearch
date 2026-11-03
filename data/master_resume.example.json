@@ -1,0 +1,52 @@
+{
+  "contact": {
+    "name": "Your Name",
+    "email": "you@example.com",
+    "phone": "+91 00000 00000",
+    "location": "Bengaluru, India",
+    "links": {
+      "linkedin": "https://linkedin.com/in/you",
+      "github": "https://github.com/you",
+      "portfolio": ""
+    }
+  },
+  "summary": "One-line truthful summary of your background and target role.",
+  "skills_inventory": [
+    "Python", "Java", "Spring Boot", "React", "TypeScript",
+    "PostgreSQL", "AWS", "Docker", "REST APIs", "Git"
+  ],
+  "experience": [
+    {
+      "company": "Company A",
+      "role": "Software Engineer",
+      "start": "2024-06",
+      "end": "Present",
+      "location": "Remote",
+      "bullets": [
+        "Built X that did Y, improving Z by N%.",
+        "Owned the migration from A to B across M services."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Project Name",
+      "stack": ["Python", "FastAPI", "Postgres"],
+      "url": "https://github.com/you/project",
+      "bullets": [
+        "Shipped feature X used by N users.",
+        "Reduced p95 latency from A ms to B ms."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Your College",
+      "degree": "B.Tech, CSE",
+      "start": "2021",
+      "end": "2025",
+      "notes": ""
+    }
+  ],
+  "certifications": []
+}

@@ -1,0 +1,34 @@
+# Curated startup watchlist, pruned to slugs verified live on 2026-11-03.
+# Add/remove freely. Dead slugs are logged + skipped, so stragglers are fine.
+
+greenhouse:
+  - stripe        # fintech
+  - mercury
+  - brex
+  - gitlab        # devtools / infra
+  - cloudflare
+  - datadog
+  - figma         # product
+  - discord
+  - reddit
+  - airbnb
+  - instacart
+  - scaleai       # AI
+  - anthropic
+  - gusto         # HR / payroll
+  - checkr
+
+lever:
+  - palantir
+
+ashby:
+  - ramp          # 2024+ YC-adjacent startups
+  - linear
+  - supabase
+  - posthog
+  - resend
+  - modal
+  - hex
+  - mintlify
+  - cursor
+  - perplexity
