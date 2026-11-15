@@ -15,6 +15,6 @@
   },
   "devDependencies": {
     "vitest": "^2.1.0",
-    "wrangler": "^4.162.0"
+    "wrangler": "4.116.0"
   }
 }
