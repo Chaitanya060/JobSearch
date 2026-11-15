@@ -2,7 +2,10 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { requireAuth } from './middleware/auth.js'
 import { ok, fail } from './lib/response.js'
-import { getMe, getProfile, patchProfile, getPreferences, putPreferences } from './routes/user.js'
+import { getMe, getProfile, patchProfile, getPreferences, putPreferences, completeOnboarding } from './routes/user.js'
+import { listJobs, getJobById, recommendedJobs } from './routes/jobs.js'
+import { listSaved, saveJob, unsaveJob } from './routes/saved.js'
+import { listApplications, getApplication, createApplication, patchApplication } from './routes/applications.js'
 
 const app = new Hono()
 
@@ -12,7 +15,7 @@ app.use('*', async (c, next) => {
   await next()
 })
 
-// Strict CORS — exact origin only, never "*" for credentialed APIs (spec §8).
+// Strict CORS — exact origin only, never "*" for credentialed APIs.
 app.use('*', (c, next) =>
   cors({
     origin: c.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -22,30 +25,43 @@ app.use('*', (c, next) =>
   })(c, next)
 )
 
-// Public
+// ---- Public ----
 app.get('/api/health', (c) => ok(c, { status: 'ok', env: c.env.APP_ENV || 'unknown' }))
+app.get('/api/jobs', listJobs)
+app.get('/api/jobs/:id', getJobById)
 
-// Authenticated
+// ---- Authenticated ----
 app.get('/api/me', requireAuth, getMe)
+app.post('/api/profile/complete-onboarding', requireAuth, completeOnboarding)
 app.get('/api/profile/me', requireAuth, getProfile)
 app.patch('/api/profile/me', requireAuth, patchProfile)
 app.get('/api/preferences', requireAuth, getPreferences)
 app.put('/api/preferences', requireAuth, putPreferences)
 
-// Contract placeholders — built in later milestones (onboarding, R2, jobs, admin).
-// They exist so the client contract is stable; they do NOT fake data.
+app.get('/api/recommended-jobs', requireAuth, recommendedJobs)
+
+app.get('/api/saved-jobs', requireAuth, listSaved)
+app.post('/api/saved-jobs', requireAuth, saveJob)
+app.delete('/api/saved-jobs/:jobId', requireAuth, unsaveJob)
+
+app.get('/api/applications', requireAuth, listApplications)
+app.get('/api/applications/:id', requireAuth, getApplication)
+app.post('/api/applications', requireAuth, createApplication)
+app.patch('/api/applications/:id', requireAuth, patchApplication)
+
+// Resumes: list is empty until R2 upload lands (Milestone 6).
+app.get('/api/resumes', requireAuth, (c) => ok(c, []))
+
+// Not yet built (later milestones): profile skills/experience, resume upload, admin.
 const TODO = [
-  ['post', '/api/profile/complete-onboarding'],
   ['get', '/api/profile/skills'],
   ['put', '/api/profile/skills'],
   ['get', '/api/profile/experience'],
-  ['get', '/api/jobs'],
-  ['get', '/api/jobs/recommended'],
-  ['get', '/api/saved-jobs'],
-  ['get', '/api/applications'],
-  ['get', '/api/resumes'],
   ['post', '/api/resumes'],
   ['get', '/api/admin/overview'],
+  ['get', '/api/admin/sources'],
+  ['get', '/api/admin/ingestion-runs'],
+  ['get', '/api/admin/jobs'],
 ]
 for (const [method, path] of TODO) {
   app[method](path, requireAuth, (c) => fail(c, 'NOT_IMPLEMENTED', 'Endpoint not yet available', 501))
@@ -59,7 +75,6 @@ app.onError((err, c) => {
 
 export default {
   fetch: app.fetch,
-  // Scheduled job collection is a later phase; keep the trigger wired but inert.
   async scheduled(_event, _env, _ctx) {
     console.log('[jobpilot-api] scheduled run — ingestion not yet implemented')
   },

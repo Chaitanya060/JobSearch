@@ -34,6 +34,21 @@ export async function getMe(c) {
   return ok(c, { profile, onboardingCompleted: !!profile.onboarding_completed })
 }
 
+// POST /api/profile/complete-onboarding — mark the profile done so the user
+// reaches the app. The real 7-step flow (Milestone 5) will call this after save.
+export async function completeOnboarding(c) {
+  const supabase = getSupabase(c.env)
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ onboarding_completed: true, profile_completed_at: now, updated_at: now })
+    .eq('firebase_uid', c.get('uid'))
+    .select('*')
+    .single()
+  if (error) return fail(c, 'SERVER_ERROR', 'Could not complete onboarding', 500)
+  return ok(c, { profile: data, onboardingCompleted: true })
+}
+
 export async function getProfile(c) {
   const supabase = getSupabase(c.env)
   const { data, error } = await supabase

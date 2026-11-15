@@ -87,6 +87,12 @@ function sortJobs(list, sort) {
 }
 
 export const api = {
+  async completeOnboarding() {
+    if (!USE_MOCKS) return request('/api/profile/complete-onboarding', { method: 'POST' })
+    await delay(140)
+    return { onboardingCompleted: true }
+  },
+
   // ---- jobs (public) ----
   async getJobs(params = {}) {
     if (!USE_MOCKS) return request(`/api/jobs?${new URLSearchParams(params)}`)
