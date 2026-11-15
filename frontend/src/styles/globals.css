@@ -1,0 +1,194 @@
+@import 'tailwindcss';
+
+/* Theme is driven by a concrete data-theme="light|dark" on <html>.
+   The useTheme hook resolves "System" to light/dark at runtime, so this
+   variant only ever needs to key off the explicit attribute. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ---- Semantic design tokens (Full UI/UX spec §1) ---- */
+:root {
+  --color-primary: #5b5ce2;
+  --color-primary-hover: #4b4cd4;
+  --color-primary-fg: #ffffff;
+  --color-accent: #14866d;
+
+  --color-bg: #f5f7fb;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-2: #eef2f8;
+  --color-border: #e1e7f0;
+
+  --color-text: #152033;
+  --color-text-muted: #65728a;
+
+  --color-success: #14866d;
+  --color-warning: #b7791f;
+  --color-error: #c54848;
+  --color-info: #3478c8;
+
+  --radius-card: 1rem; /* 16px */
+
+  /* Elevation (Full UI/UX spec §1 — subtle shadows, varied surfaces) */
+  --shadow-sm: 0 1px 2px rgba(20, 35, 70, 0.05), 0 1px 3px rgba(20, 35, 70, 0.04);
+  --shadow-md: 0 4px 12px rgba(20, 35, 70, 0.08);
+  --shadow-lg: 0 12px 34px rgba(20, 35, 70, 0.12);
+
+  /* Glass recipe (Animation/Glass spec §4 — light) */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 8px 30px rgba(20, 35, 70, 0.08);
+  --glass-blur: 16px;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --color-primary: #7b7df5;
+  --color-primary-hover: #8f90f8;
+  --color-primary-fg: #0b1020;
+  --color-accent: #43c99a;
+
+  --color-bg: #0b1020;
+  --color-surface: #111a2c;
+  --color-surface-raised: #162136;
+  --color-surface-2: #1b2940;
+  --color-border: rgba(160, 180, 215, 0.14);
+
+  --color-text: #f2f5fc;
+  --color-text-muted: #a6b2c7;
+
+  --color-success: #43c99a;
+  --color-warning: #e8b45b;
+  --color-error: #f17676;
+  --color-info: #68a8f5;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.42);
+
+  --glass-bg: rgba(17, 26, 44, 0.68);
+  --glass-bg-strong: rgba(17, 26, 44, 0.8);
+  --glass-border: rgba(190, 210, 245, 0.12);
+  --glass-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  --glass-blur: 18px;
+
+  color-scheme: dark;
+}
+
+/* ---- Expose tokens to Tailwind utilities (bg-surface, text-muted, ...) ---- */
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-fg: var(--color-primary-fg);
+  --color-accent: var(--color-accent);
+
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-2: var(--color-surface-2);
+  --color-border: var(--color-border);
+
+  --color-text: var(--color-text);
+  --color-muted: var(--color-text-muted);
+
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+  --color-info: var(--color-info);
+
+  --radius-card: var(--radius-card);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+/* Tabular numerals for counts/dates/scores. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Glass material (used selectively — spec §4) ---- */
+.glass,
+.glass-strong {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  isolation: isolate;
+}
+.glass-strong {
+  background: var(--glass-bg-strong);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass,
+  .glass-strong {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(128%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(128%);
+  }
+}
+/* Solid fallback where backdrop-filter is unsupported. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong {
+    background: var(--color-surface);
+  }
+}
+
+/* ---- One soft ambient gradient behind the landing hero only (spec §5) ---- */
+.ambient-gradient {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 120%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(40% 50% at 25% 30%, color-mix(in oklab, var(--color-primary) 22%, transparent), transparent 70%),
+    radial-gradient(38% 46% at 80% 20%, color-mix(in oklab, var(--color-accent) 16%, transparent), transparent 70%);
+  filter: blur(8px);
+  opacity: 0.55;
+  animation: ambient-drift 20s ease-in-out infinite alternate;
+}
+@keyframes ambient-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(0, -2%, 0) scale(1.06); }
+}
+
+/* Visible focus ring for keyboard users. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ambient-gradient {
+    animation: none;
+  }
+}

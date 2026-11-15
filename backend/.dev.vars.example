@@ -1,0 +1,15 @@
+# Copy to backend/.dev.vars (gitignored) and fill with your DEV values.
+# These are read by `wrangler dev`. NEVER commit real values.
+#
+# FIREBASE_PROJECT_ID — your Firebase project id (e.g. from the Firebase console).
+# SUPABASE_URL        — https://<project-ref>.supabase.co
+# SUPABASE_SECRET_KEY — Supabase server-side secret key (sb_secret_... / service key).
+#                        Backend-only. Bypasses RLS, so route-level UID checks are mandatory.
+# CORS_ORIGIN         — exact dev frontend origin.
+# APP_ENV             — development | production
+
+FIREBASE_PROJECT_ID=
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
+CORS_ORIGIN=http://localhost:5173
+APP_ENV=development

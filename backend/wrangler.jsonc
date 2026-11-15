@@ -1,0 +1,23 @@
+{
+  // Non-secret config only. Secrets go via `wrangler secret put ...` (prod)
+  // or backend/.dev.vars (local dev). Never put SUPABASE_SECRET_KEY here.
+  "name": "jobpilot-api-dev",
+  "main": "src/index.js",
+  "compatibility_date": "2024-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_ENV": "development"
+    // FIREBASE_PROJECT_ID and CORS_ORIGIN come from .dev.vars locally and
+    // from `wrangler secret`/dashboard vars in production.
+  },
+  "r2_buckets": [
+    {
+      "binding": "RESUME_BUCKET",
+      "bucket_name": "jobpilot-resumes-dev"
+    }
+  ],
+  "triggers": {
+    // One scheduled collection run (job ingestion is a later phase).
+    "crons": ["0 */6 * * *"]
+  }
+}
